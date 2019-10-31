@@ -7,12 +7,12 @@ from PyQt5 import QtCore
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
-from panel import Panel
+from panel import PanelManager
 
 import proxy
 
 __title__ = "Мониторинг последовательного канала КЭД КФ1/1М"
-__version__ = "v0.1.0"
+__version__ = "0.1.0"
 __author__ = "Александр Смирнов"
 
 config = {
@@ -43,7 +43,7 @@ class Ui(QMainWindow):
         self.move(frameGm.topLeft())
 
     def createUI(self):
-        self.setWindowTitle("{0} (ver. {1})".format(__title__, __version__))
+        self.setWindowTitle("{0} (v. {1})".format(__title__, __version__))
         self.setWindowIcon(QIcon(":/rc/logo.png"))
         self.setMaximumSize(600, 500)
 
@@ -56,7 +56,7 @@ class Ui(QMainWindow):
         self.control = self.createButtons()
 
         gbox = QGroupBox()
-        self.panel = Panel(gbox)
+        self.panel = PanelManager(gbox)
 
         # Layouts
         centralLayout = QVBoxLayout(centralWgt)
@@ -80,13 +80,13 @@ class Ui(QMainWindow):
 
         self.buttons = {}
         for (name, key, enabled, icon) in (
-                ('старт', 'start', True, ':/rc/red-start.png'),
-                ('стоп', 'stop', False, ':/rc/red-stop.png'),
-                ('сброс', 'reset', True, ':/rc/red-stop.png'),
-                ('справка', 'about', True, ':/rc/red-about.png'),
-                ('выход', 'exit', True, ':/rc/red-quit.png')
+                ('Cтарт', 'start', True, ':/rc/red-start.png'),
+                ('Cтоп', 'stop', False, ':/rc/red-stop.png'),
+                ('Cброс', 'reset', True, ':/rc/red-stop.png'),
+                ('Cправка', 'about', True, ':/rc/red-about.png'),
+                ('Выход', 'exit', True, ':/rc/red-quit.png')
         ):
-            self.buttons[key] = button = QPushButton(name.capitalize())
+            self.buttons[key] = button = QPushButton(name)
             button.setEnabled(enabled)
             button.setIcon(QIcon(icon))
             layout.addWidget(button)
@@ -169,20 +169,18 @@ class Ui(QMainWindow):
         self.degausbox_widgets = {}
         row, col = (0, 0)
         for key, title, items in (
-                ('header', 'Протокол', config['degaus']['headers']),
+                #('header', 'Протокол', config['degaus']['headers']),
                 ('channels', 'Число каналов', config['degaus']['channels']),
                 ('imax', 'Макс. ток, А', config['degaus']['currents']),
                 ('interval', 'Интервал, мс', config['degaus']['interval'])
         ):
-            if key in "header":
-                continue
             combo = QComboBox()
             combo.setObjectName(key)
             combo.setFixedWidth(65)
             combo.addItems(items)
-            combo.setStyleSheet("text-align: right")
+            combo.setStyleSheet("text-align: left")
 
-            # Signal/Slo
+            # Signal/Slot
             combo.currentTextChanged['QString'].connect(_update_data)
             layout.addWidget(QLabel(title + ":"), row, 0)
             layout.addWidget(combo, row, 1)
@@ -207,10 +205,10 @@ class Ui(QMainWindow):
         return wgt
 
     def createStatusbar(self):
-        pix = QLabel()
+        pix = QLabel("idle")
         self.statusBar().addPermanentWidget(pix)
-        self.status['pixmap'] = pix
-        self.updatePixmap('noconnect')
+        #self.status['pixmap'] = pix
+        #self.updatePixmap('noconnect')
 
     def _lock(self, is_lock):
         self.portbox.setDisabled(is_lock)
@@ -249,15 +247,11 @@ class ProxyApp(Ui):
 
         self.timer_id = None
 
-        # TODO: Widget disabled because there is no implementation
-#        self.degausbox_widgets['header'].setDisabled(True)
-
         # Connect signal/slot
         self.buttons['start'].clicked.connect(self.on_start)
         self.buttons['stop'].clicked.connect(self.on_stop)
         self.buttons['reset'].clicked.connect(self.on_reset)
         self.buttons['exit'].clicked.connect(self.on_quit)
-
         self.degausbox_widgets['channels'].currentTextChanged['QString'].connect(self.on_change_channels)
 
     def closeEvent(self, event):
@@ -279,9 +273,9 @@ class ProxyApp(Ui):
         nChannels = int(text)
 
         if nChannels > 50:
-            self.panel.visible_radiobox(True)
+            self.panel.radiobox_locked(True)
         else:
-            self.panel.visible_radiobox(False)
+            self.panel.radiobox_locked(False)
 
     def on_run(self):
         """ """

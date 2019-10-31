@@ -7,7 +7,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 
-class Panel:
+class PanelManager:
     def __init__(self, parent=None, *args, **kwargs):
         self.parent = parent
 
@@ -35,6 +35,7 @@ class Panel:
 
         def _on_switch_group(rbutton):
             """ If switch group, then rename field labels by panel"""
+            print(list(self.pcontrol.get_states()))
             group_name = rbutton.text()
             if group_name == "I":
                 new_names = (str(i) for i in range(1,51))
@@ -91,8 +92,8 @@ class Panel:
 
     def switch_to_panelview(self):
         self.stack.setCurrentIndex(0)
-        self.buttonAll.setVisible(False)
         self.parent.setTitle(self.modes[0])
+        self.buttonAll.setVisible(False)  
 
     def control_fetch(self):
         return self.pcontrol.get_states()
@@ -106,10 +107,15 @@ class Panel:
     def view_clear(self):
         self.pview.clear()
 
-    def visible_radiobox(self, locked):
+    def radiobox_locked(self, locked):
         self.radiobox.setEnabled(locked)
         if not locked:
-            pass
+            #self.radiobox.setToDefault()
+            default_button = self.radiobox.group.buttons()[0]
+            default_button.setChecked(True)
+            self.radiobox.buttonClicked.emit(default_button)
+        self.pattern = 150 * [self.states[2]]
+
 
 class PanelBase(QWidget):
     ROW = 10
@@ -124,7 +130,7 @@ class PanelBase(QWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def fillWidget(self, wgt, **kwargs):
+    def createUI(self, wgt, **kwargs):
         row, col = (PanelBase.ROW, PanelBase.COL)
         for c in range(col):
             for r in range(row):
@@ -147,7 +153,7 @@ class PanelView(PanelBase):
 
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.fillWidget(NamedEdit)
+        self.createUI(NamedEdit)
 
     def update_(self, data):
         for item, value in zip(self.items, data):
@@ -161,7 +167,15 @@ class PanelControl(PanelBase):
     def __init__(self, parent=None, states=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.states = states
-        self.fillWidget(NamedSwitchButton, labels=self.states)
+        self.createUI(NamedSwitchButton, labels=self.states)
+
+        # Connect signal/slot
+        for item in self.items:
+             item.clicked[int, str].connect(self._on_store_data)
+    
+    def _on_store_data(self, index, value):
+        print(index, value)
+        
 
     def update_(self, data):
         for item, value in zip(self.items, data):
@@ -170,6 +184,7 @@ class PanelControl(PanelBase):
     def set_states(self, states):
         for item in self.items:
             item.switch_to(states)
+        #print(list(self.get_states()))
 
     def get_states(self):
         return (item.text() for item in self.items)
@@ -189,7 +204,7 @@ class NamedWidget(QWidget):
 
 
 class NamedSwitchButton(NamedWidget):
-    clicked = QtCore.pyqtSignal()
+    clicked = QtCore.pyqtSignal(int, str)
 
     def __init__(self, parent=None, name='Label', labels=None, *args, **kwargs):
         super().__init__(parent, name, *args, **kwargs)
@@ -197,12 +212,16 @@ class NamedSwitchButton(NamedWidget):
         self.button = button = SwitchButton(labels=labels)
         button.setFixedWidth(40)
         button.setFixedHeight(20)
-
         layout = self.layout = QFormLayout(self)
         layout.setContentsMargins(2, 1, 1, 1)
         self.layout.addRow(self.label, self.button)
 
-        self.button.clicked.connect(self.clicked)
+        self.button.clicked.connect(self._on_clicked)
+    
+    def _on_clicked(self):
+        index = int(self.label.text()[:-1]) - 1
+        value = self.button.text()
+        self.clicked.emit(index, value)
 
     def text(self):
         return self.button.text()
@@ -225,8 +244,6 @@ class NamedEdit(NamedWidget):
         edit.setReadOnly(True)
         edit.setText('-')
         edit.setAlignment(QtCore.Qt.AlignCenter)
-        #edit.setFixedWidth(40)
-        #edit.setFixedHeight(20)
 
         layout = self.layout = QFormLayout(self)
         layout.setContentsMargins(2, 1, 1, 1)
