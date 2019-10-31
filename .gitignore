@@ -1,0 +1,17 @@
+
+/.idea
+/.ropeproject
+/.pytest_cache
+.vscode/
+/__pycache__
+/test/__pycache__
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+*.bak
+*.bat
+*.dat
+*.ini
+*.pyc
+*.txt
