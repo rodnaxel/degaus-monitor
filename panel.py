@@ -17,11 +17,10 @@ class PanelManager:
         self.pattern = None
         self.values = None
 
-        self.create_widget()
+        self.createUi()
 
-    def create_widget(self):
-        self.parent.setTitle('Амперметры')
-
+    def createUi(self):
+        
         def _on_switch_panel():
             current = self.stack.currentIndex()
             if current == 0:
@@ -53,8 +52,10 @@ class PanelManager:
             index = self.states.index(state)
             self.pcontrol.set_states(index)
 
+        self.parent.setTitle('Амперметры')
+
         # Radiobuttons for switch group (only channels more than 50)
-        self.radiobox = radiobox = RadioBox(title="Группа обмоток: ", group_names=('I', 'II', 'III'))
+        self.radiobox = RadioBox(title="Группа обмоток: ", group_names=('I', 'II', 'III'))
         self.radiobox.setEnabled(False)
 
         #  Button used to switch all switcher of control panel at one time
@@ -63,6 +64,7 @@ class PanelManager:
 
         # Button used to switch between control and view panels
         self.buttonSwitch = SwitchButton(labels=["Настройки", "Амперметры"])
+        self.buttonSwitch.setMinimumWidth(120)
 
         # Panels
         self.pview = PanelView()
@@ -70,7 +72,7 @@ class PanelManager:
 
         # Layouts
         hbox = QHBoxLayout()
-        hbox.addWidget(radiobox)
+        hbox.addWidget(self.radiobox)
         hbox.addStretch(2)
         hbox.addWidget(self.buttonAll)
         hbox.addWidget(self.buttonSwitch)
@@ -86,7 +88,7 @@ class PanelManager:
         layout.addLayout(stack)
 
         # Connect Signal/Slots
-        radiobox.buttonClicked[QAbstractButton].connect(_on_switch_group)
+        self.radiobox.buttonClicked[QAbstractButton].connect(_on_switch_group)
         self.buttonAll.clicked.connect(_on_switch_pattern)
         self.buttonSwitch.clicked.connect(_on_switch_panel)
 
@@ -123,14 +125,13 @@ class PanelBase(QWidget):
     
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-
         self.items = []
 
+    def createUI(self, wgt, **kwargs):
         layout = QGridLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
 
-    def createUI(self, wgt, **kwargs):
         row, col = (PanelBase.ROW, PanelBase.COL)
         for c in range(col):
             for r in range(row):
@@ -138,7 +139,7 @@ class PanelBase(QWidget):
                 edit = wgt(name=name, **kwargs)
                 self.layout().addWidget(edit, r, c)
                 self.items.append(edit)
-
+        
     def clear(self):
         for item in self.items:
             item.clear()
@@ -149,7 +150,10 @@ class PanelBase(QWidget):
 
 
 class PanelView(PanelBase):
-    """ This class representing widget to show values of voltage/current in the channels """
+    """ 
+    This class representing widget to show values 
+    of voltage/current in the channels 
+    """
 
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -184,7 +188,6 @@ class PanelControl(PanelBase):
     def set_states(self, states):
         for item in self.items:
             item.switch_to(states)
-        #print(list(self.get_states()))
 
     def get_states(self):
         return (item.text() for item in self.items)
@@ -208,17 +211,21 @@ class NamedSwitchButton(NamedWidget):
 
     def __init__(self, parent=None, name='Label', labels=None, *args, **kwargs):
         super().__init__(parent, name, *args, **kwargs)
+        self.labels = labels
+        self.createUi()
 
-        self.button = button = SwitchButton(labels=labels)
+    def createUi(self):
+        self.button = button = SwitchButton(labels=self.labels)
         button.setFixedWidth(40)
         button.setFixedHeight(20)
-        layout = self.layout = QFormLayout(self)
+        layout =  QFormLayout(self)
         layout.setContentsMargins(2, 1, 1, 1)
-        self.layout.addRow(self.label, self.button)
+        layout.addRow(self.label, self.button)
 
-        self.button.clicked.connect(self._on_clicked)
+        # Connect signals/slots
+        self.button.clicked.connect(self._on_wrapped_clicked)
     
-    def _on_clicked(self):
+    def _on_wrapped_clicked(self):
         index = int(self.label.text()[:-1]) - 1
         value = self.button.text()
         self.clicked.emit(index, value)
@@ -239,18 +246,19 @@ class NamedSwitchButton(NamedWidget):
 class NamedEdit(NamedWidget):
     def __init__(self, parent=None, name='Label', *args, **kwargs):
         super().__init__(parent, name, *args, **kwargs)
+        self.createUi()
 
+    def createUi(self):
         self.edit = edit = QLineEdit()
+        self.edit.setText('-')
         edit.setReadOnly(True)
-        edit.setText('-')
         edit.setAlignment(QtCore.Qt.AlignCenter)
 
-        layout = self.layout = QFormLayout(self)
+        layout = QFormLayout(self)
         layout.setContentsMargins(2, 1, 1, 1)
-        self.layout.addRow(self.label, self.edit)
+        layout.addRow(self.label, self.edit)
 
     def clear(self):
-        self.edit.clear()
         self.edit.setText('-')
 
     def display(self, value):
@@ -262,31 +270,28 @@ class NamedEdit(NamedWidget):
 
 class SwitchButton(QPushButton):
     def __init__(self, parent=None, labels=None, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-
+        super().__init__(text='new', *args, **kwargs)
         self.labels = labels # [1,2,3,4]
-        self.current = 0
-        self.count = len(self.labels)
-        self.setText(self.labels[self.current])
-
-    def reset(self):
-        self.current = 0
-        self.setText(self.labels[self.current])
+        self.setText(self.labels[0])
 
     def mousePressEvent(self, e):
         self.switch()
         super().mousePressEvent(e)
 
-    def switch(self):
-        if self.current < (self.count - 1):
-            self.current += 1
-        else:
-            self.current = 0
+    def reset(self):
+        self.current = 0
         self.setText(self.labels[self.current])
 
-    def switch_to(self, to):
-        self.current = to
-        self.setText(self.labels[self.current])
+    def switch(self):
+        current_index = self.labels.index(self.text()) 
+        try:
+            next_state = self.labels[current_index + 1]
+        except IndexError:
+            next_state = self.labels[0]
+        self.setText(next_state) 
+
+    def switch_to(self, index):
+        self.setText(self.labels[index])
 
 
 class RadioBox(QWidget):
@@ -297,6 +302,9 @@ class RadioBox(QWidget):
         self.title = title
         self.group_names = group_names
 
+        self.createUi()
+
+    def createUi(self):
         label = QLabel(self.title)
         layout = QHBoxLayout(self)
         layout.addWidget(label)
@@ -309,7 +317,14 @@ class RadioBox(QWidget):
             group.addButton(rb)
             layout.addWidget(rb)
 
+        # Connect signal/slot
         group.buttonClicked[QAbstractButton].connect(self.buttonClicked)
+    
+    def setChecked(self, index):
+        btn = list(self.group.buttons())[index]
+        btn.setChecked(True)
+        self.buttonClicked.emit(btn)
+
 
 
 if __name__ == '__main__':
