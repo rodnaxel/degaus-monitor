@@ -15,12 +15,15 @@ __title__ = "Мониторинг последовательного канал�
 __version__ = "0.1.0"
 __author__ = "Александр Смирнов"
 
+
+PATH = os.path.dirname(os.path.realpath(__file__))
+
 config = {
     "degaus": {
-        "headers": ["CM2", "AMК/СМ2"],
-        "channels": ["43", "121", "150"],
-        "currents": ["10", "55"],
-        "interval": ["1000"]
+        "headers": ("CM2",),
+        "channels": ("43", "121", "150"),
+        "currents": ("10", "55"),
+        "interval": ("1000",)
     }
 }
 
@@ -56,7 +59,7 @@ class Ui(QMainWindow):
         self.control = self.createButtons()
 
         gbox = QGroupBox()
-        self.panel = PanelManager(gbox)
+        self.panel = PanelManager(gbox, n_channels=self.degaus_config['channels'])
 
         # Layouts
         centralLayout = QVBoxLayout(centralWgt)
@@ -125,6 +128,8 @@ class Ui(QMainWindow):
             port_input.clear()
             port_output.clear()
             ports = proxy.scan()
+            ports.append('virtual')
+            
             port_input.addItems(ports)
             port_output.addItems(ports)
 
@@ -158,7 +163,7 @@ class Ui(QMainWindow):
 
         def _update_data():
             self.degaus_config = {
-              #  "header": wgt.findChild(QComboBox, 'header').currentText(),
+                "header": wgt.findChild(QComboBox, 'header').currentText(),
                 "channels": int(wgt.findChild(QComboBox, 'channels').currentText()),
                 "channels_byte": bool(wgt.findChild(QCheckBox, 'channels_byte').checkState()),
                 "imax": int(wgt.findChild(QComboBox, 'imax').currentText()),
@@ -166,10 +171,10 @@ class Ui(QMainWindow):
                 "interval": int(wgt.findChild(QComboBox, 'interval').currentText())
             }
 
-        self.degausbox_widgets = {}
+        self.protocol_group = {}
         row, col = (0, 0)
         for key, title, items in (
-                #('header', 'Протокол', config['degaus']['headers']),
+                ('header', 'Протокол', config['degaus']['headers']),
                 ('channels', 'Число каналов', config['degaus']['channels']),
                 ('imax', 'Макс. ток, А', config['degaus']['currents']),
                 ('interval', 'Интервал, мс', config['degaus']['interval'])
@@ -179,13 +184,15 @@ class Ui(QMainWindow):
             combo.setFixedWidth(65)
             combo.addItems(items)
             combo.setStyleSheet("text-align: left")
+            if combo.count() < 2:
+                combo.setDisabled(True)
 
             # Signal/Slot
             combo.currentTextChanged['QString'].connect(_update_data)
             layout.addWidget(QLabel(title + ":"), row, 0)
             layout.addWidget(combo, row, 1)
 
-            self.degausbox_widgets[key] = combo
+            self.protocol_group[key] = combo
 
             # If check byte include in header message
             if key in ['channels', 'imax']:
@@ -195,7 +202,7 @@ class Ui(QMainWindow):
                     check.setChecked(True)
                 layout.addWidget(check, row, 2)
                 check.stateChanged['int'].connect(_update_data)
-                self.degausbox_widgets["{}_byte".format(key)] = check
+                self.protocol_group["{}_byte".format(key)] = check
 
             layout.setColumnStretch(2, 2)
             row += 1
@@ -252,7 +259,7 @@ class ProxyApp(Ui):
         self.buttons['stop'].clicked.connect(self.on_stop)
         self.buttons['reset'].clicked.connect(self.on_reset)
         self.buttons['exit'].clicked.connect(self.on_quit)
-        self.degausbox_widgets['channels'].currentTextChanged['QString'].connect(self.on_change_channels)
+        self.protocol_group['channels'].currentTextChanged['QString'].connect(self.on_change_channels)
 
     def closeEvent(self, event):
         self.on_quit()
@@ -337,6 +344,12 @@ if __name__ == '__main__':
         myappid = u'navi-dals.kf1-m.proxy.001'  # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         app.setWindowIcon(QIcon(':/rc/Interdit.ico'))
+
+    try:
+        with open(os.path.join(PATH, "config.json")) as f:
+            config = json.load(f)
+    except FileNotFoundError as e:
+        pass
 
     pui = ProxyApp()
     sys.exit(app.exec_())

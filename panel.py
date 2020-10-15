@@ -9,13 +9,17 @@ from PyQt5.QtWidgets import *
 
 class PanelManager:
     def __init__(self, parent=None, *args, **kwargs):
+        print("Create PanelManager:", parent, args, kwargs)
+
         self.parent = parent
 
         self.modes = ["Амперметры", "Настройки"]
         self.states = ["Max", 'Min', 'Null', 'L']
 
-        self.pattern = None
+        self.pattern = kwargs['n_channels'] * [self.states[2]]
         self.values = None
+
+        print(f"{self.pattern=}")
 
         self.createUi()
 
@@ -68,7 +72,7 @@ class PanelManager:
 
         # Panels
         self.pview = PanelView()
-        self.pcontrol = PanelControl(states=self.states)
+        self.pcontrol = PanelControl(states=self.states, pattern=self.pattern)
 
         # Layouts
         hbox = QHBoxLayout()
@@ -168,7 +172,7 @@ class PanelView(PanelBase):
 class PanelControl(PanelBase):
     """ The class representing widget to configure of voltage/current in the channels """
 
-    def __init__(self, parent=None, states=None, *args, **kwargs):
+    def __init__(self, parent=None, states=None, pattern=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.states = states
         self.createUI(NamedSwitchButton, labels=self.states)
@@ -177,6 +181,10 @@ class PanelControl(PanelBase):
         for item in self.items:
              item.clicked[int, str].connect(self._on_store_data)
     
+        print('Create PanelControl: ', pattern)
+        self.update_(pattern)
+
+
     def _on_store_data(self, index, value):
         print(index, value)
         
