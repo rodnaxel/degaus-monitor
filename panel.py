@@ -10,17 +10,12 @@ from PyQt5.QtWidgets import *
 class PanelManager:
     def __init__(self, parent=None, *args, **kwargs):
         print("Create PanelManager:", parent, args, kwargs)
-
         self.parent = parent
-
         self.modes = ["Амперметры", "Настройки"]
         self.states = ["Max", 'Min', 'Null', 'L']
-
-        self.pattern = kwargs['n_channels'] * [self.states[2]]
-        self.values = None
-
-        print(f"{self.pattern=}")
-
+        
+        self.n_channels = kwargs['n_channels']
+        
         self.createUi()
 
     def createUi(self):
@@ -38,23 +33,24 @@ class PanelManager:
 
         def _on_switch_group(rbutton):
             """ If switch group, then rename field labels by panel"""
-            print(list(self.pcontrol.get_states()))
-            group_name = rbutton.text()
-            if group_name == "I":
-                new_names = (str(i) for i in range(1,51))
-            elif group_name == "II":
-                new_names = (str(i) for i in range(51,101))
-            elif group_name == "III":
-                new_names = (str(i) for i in range(101,151))
+            group = rbutton.text()
+            if group == "I":
+                labels = (str(i) for i in range(1,51))
+            elif group == "II":
+                labels = (str(i) for i in range(51,101))
+            elif group == "III":
+                labels = (str(i) for i in range(101,151))
             else:
                 raise ValueError("Dont find group name")
-            current_panel = self.stack.currentWidget()
-            current_panel.rename(new_names)
+            current = self.stack.currentWidget()
+            current.rename(labels)
 
-        def _on_switch_pattern():
-            state = self.buttonAll.text()
-            index = self.states.index(state)
-            self.pcontrol.set_states(index)
+        def _on_switch_all_buttons():
+            label = self.buttonAll.text()
+            data = [label for i in range(self.n_channels)]
+            self.pcontrol.setModel(data)
+            #index = self.states.index(label)
+            #self.pcontrol.set_states(index)
 
         self.parent.setTitle('Амперметры')
 
@@ -63,7 +59,7 @@ class PanelManager:
         self.radiobox.setEnabled(False)
 
         #  Button used to switch all switcher of control panel at one time
-        self.buttonAll = SwitchButton(labels=self.states)
+        self.buttonAll = SwitchButton()
         self.buttonAll.setVisible(False)
 
         # Button used to switch between control and view panels
@@ -72,8 +68,10 @@ class PanelManager:
 
         # Panels
         self.pview = PanelView()
-        self.pcontrol = PanelControl(states=self.states, pattern=self.pattern)
 
+        data = [self.states[2] for i in range(self.n_channels)]
+        self.pcontrol = PanelControl(data=data)
+        
         # Layouts
         hbox = QHBoxLayout()
         hbox.addWidget(self.radiobox)
@@ -93,7 +91,7 @@ class PanelManager:
 
         # Connect Signal/Slots
         self.radiobox.buttonClicked[QAbstractButton].connect(_on_switch_group)
-        self.buttonAll.clicked.connect(_on_switch_pattern)
+        self.buttonAll.clicked.connect(_on_switch_all_buttons)
         self.buttonSwitch.clicked.connect(_on_switch_panel)
 
     def switch_to_panelview(self):
@@ -130,6 +128,7 @@ class PanelBase(QWidget):
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.items = []
+        self.data = []
 
     def createUI(self, wgt, **kwargs):
         layout = QGridLayout(self)
@@ -172,33 +171,39 @@ class PanelView(PanelBase):
 class PanelControl(PanelBase):
     """ The class representing widget to configure of voltage/current in the channels """
 
-    def __init__(self, parent=None, states=None, pattern=None, *args, **kwargs):
+    def __init__(self, parent=None, data=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.states = states
-        self.createUI(NamedSwitchButton, labels=self.states)
+        self.data = data
+
+        self.createUI(NamedSwitchButton)
 
         # Connect signal/slot
         for item in self.items:
              item.clicked[int, str].connect(self._on_store_data)
-    
-        print('Create PanelControl: ', pattern)
-        self.update_(pattern)
 
+        # If send data then update view
+        if self.data:
+            self.update_()
 
     def _on_store_data(self, index, value):
-        print(index, value)
-        
+        if index <= len(self.data):
+            self.data[index] = value
 
-    def update_(self, data):
-        for item, value in zip(self.items, data):
-            item.setText(value)
-
-    def set_states(self, states):
-        for item in self.items:
-            item.switch_to(states)
+    def set_data(self, data):
+        self.data = data
+        self.update_()
+    
+    def set_states(self, data):
+        self.set_data(data)
 
     def get_states(self):
-        return (item.text() for item in self.items)
+        print(".get_states: ", len(self.data), self.data)
+        return self.data
+
+    def update_(self):
+        for item, value in zip(self.items, self.data):
+            item.setText(value)
+
 
 
 class NamedWidget(QWidget):
@@ -211,7 +216,7 @@ class NamedWidget(QWidget):
         label.setAlignment(QtCore.Qt.AlignCenter)
 
     def setName(self, name):
-        self.label.setText(name)
+        self.label.setText(name + ":")
 
 
 class NamedSwitchButton(NamedWidget):
@@ -219,7 +224,7 @@ class NamedSwitchButton(NamedWidget):
 
     def __init__(self, parent=None, name='Label', labels=None, *args, **kwargs):
         super().__init__(parent, name, *args, **kwargs)
-        self.labels = labels
+        self.labels = labels  or ["Max", 'Min', 'Null', 'L']
         self.createUi()
 
     def createUi(self):
@@ -279,7 +284,7 @@ class NamedEdit(NamedWidget):
 class SwitchButton(QPushButton):
     def __init__(self, parent=None, labels=None, *args, **kwargs):
         super().__init__(text='new', *args, **kwargs)
-        self.labels = labels # [1,2,3,4]
+        self.labels = labels or ["Max", 'Min', 'Null', 'L']
         self.setText(self.labels[0])
 
     def mousePressEvent(self, e):
