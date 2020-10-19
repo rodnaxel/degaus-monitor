@@ -8,17 +8,21 @@ from PyQt5.QtWidgets import *
 
 
 class PanelManager:
-    def __init__(self, parent=None, *args, **kwargs):
+    def __init__(self, parent=None, size=None, *args, **kwargs):
         print("Create PanelManager:", parent, args, kwargs)
         self.parent = parent
         self.modes = ["Амперметры", "Настройки"]
         self.states = ["Max", 'Min', 'Null', 'L']
         
-        self.n_channels = kwargs['n_channels']
-        
-        self.createUi()
+        self.size = size
 
-    def createUi(self):
+        self.page = 0
+        self.pattern = [self.states[2] for i in range(self.size)]
+        self.values = [0 for i in range(self.size)]
+
+        self._createUi()
+
+    def _createUi(self):
         
         def _on_switch_panel():
             current = self.stack.currentIndex()
@@ -33,25 +37,24 @@ class PanelManager:
 
         def _on_switch_group(rbutton):
             """ If switch group, then rename field labels by panel"""
+            print('Invoke <.on_switch_group()>: ', rbutton)
             group = rbutton.text()
             if group == "I":
-                labels = (str(i) for i in range(1,51))
+                self.page = 0
             elif group == "II":
-                labels = (str(i) for i in range(51,101))
+                self.page = 1
             elif group == "III":
-                labels = (str(i) for i in range(101,151))
+                self.page = 2
             else:
                 raise ValueError("Dont find group name")
             current = self.stack.currentWidget()
-            current.rename(labels)
+
 
         def _on_switch_all_buttons():
-            label = self.buttonAll.text()
-            data = [label for i in range(self.n_channels)]
-            self.pcontrol.setModel(data)
-            #index = self.states.index(label)
-            #self.pcontrol.set_states(index)
-
+            print('Invoke <.on_switch_all_buttons()>: ',)
+            text = self.buttonAll.text()
+            self.pattern = [text for i in range(self.size)]
+            
         self.parent.setTitle('Амперметры')
 
         # Radiobuttons for switch group (only channels more than 50)
@@ -68,9 +71,7 @@ class PanelManager:
 
         # Panels
         self.pview = PanelView()
-
-        data = [self.states[2] for i in range(self.n_channels)]
-        self.pcontrol = PanelControl(data=data)
+        self.pcontrol = PanelControl(data=self.pattern)
         
         # Layouts
         hbox = QHBoxLayout()
@@ -94,16 +95,33 @@ class PanelManager:
         self.buttonAll.clicked.connect(_on_switch_all_buttons)
         self.buttonSwitch.clicked.connect(_on_switch_panel)
 
-    def switch_to_panelview(self):
+    def set_size(self, n):
+        self.size = n
+
+        # Lock/Unlock radiobuttons {I, II, III}
+        if self.size > 50:
+            self.radiobox_enabled(True)
+        else:
+            self.radiobox_enabled(False)
+
+        # Change pattern
+        self.pattern = [self.states[2] for i in range(self.size)]
+        self.pcontrol.set_model(self.pattern)
+        
+        # Change values
+        self.values = [0 for i in range(self.size)]
+
+    def show_panelview(self):
         self.stack.setCurrentIndex(0)
         self.parent.setTitle(self.modes[0])
         self.buttonAll.setVisible(False)  
 
-    def control_fetch(self):
-        return self.pcontrol.get_states()
+    def fetch_pattern(self):
+        print("pcontol.get_states(): ",self.pcontrol.get_states())
+        return self.pattern
 
     def control_clear(self):
-        self.pcontrol.clear()
+        print("Invoke .pcontrol.clear()")
 
     def view_update(self, data):
         self.pview.update_(data)
@@ -111,14 +129,13 @@ class PanelManager:
     def view_clear(self):
         self.pview.clear()
 
-    def radiobox_locked(self, locked):
-        self.radiobox.setEnabled(locked)
-        if not locked:
-            #self.radiobox.setToDefault()
+    def radiobox_enabled(self, enable):
+        self.radiobox.setEnabled(enable)
+        if not enable:
             default_button = self.radiobox.group.buttons()[0]
             default_button.setChecked(True)
             self.radiobox.buttonClicked.emit(default_button)
-        self.pattern = 150 * [self.states[2]]
+
 
 
 class PanelBase(QWidget):
@@ -127,10 +144,12 @@ class PanelBase(QWidget):
     
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.items = []
+
+        self.page = 0
+        self.delegates = []
         self.data = []
 
-    def createUI(self, wgt, **kwargs):
+    def _createUI(self, wgt, **kwargs):
         layout = QGridLayout(self)
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -141,15 +160,24 @@ class PanelBase(QWidget):
                 name = f'{c * row + r + 1}:'
                 edit = wgt(name=name, **kwargs)
                 self.layout().addWidget(edit, r, c)
-                self.items.append(edit)
+                self.delegates.append(edit)
         
+    def set_model(self, data):
+        print('Invoke <PanelBase.set_data()>', data)
+
+    def set_page(self, page):
+        self.page = page
+
     def clear(self):
-        for item in self.items:
-            item.clear()
+        for delegate in self.delegates:
+            delegate.clear()
+
+    def update_(self):
+        print('Invoke <PanelBase.update_()>')
 
     def rename(self, names):
-        for item,name in zip(self.items, names):
-            item.setName(name)
+        for delegate, name in zip(self.delegates, names):
+            delegate.setName(name)
 
 
 class PanelView(PanelBase):
@@ -160,26 +188,29 @@ class PanelView(PanelBase):
 
     def __init__(self, parent=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
-        self.createUI(NamedEdit)
+        self._createUI(NamedEdit)
 
     def update_(self, data):
-        for item, value in zip(self.items, data):
+        for item, value in zip(self.delegates, data):
             txt = '{0:=6.2f}'.format(value/100)
             item.display(txt)
 
 
 class PanelControl(PanelBase):
-    """ The class representing widget to configure of voltage/current in the channels """
+    """ 
+    The class representing widget to configure 
+    of voltage/current in the channels 
+    """
 
     def __init__(self, parent=None, data=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.data = data
 
-        self.createUI(NamedSwitchButton)
+        self._createUI(NamedSwitchButton)
 
         # Connect signal/slot
-        for item in self.items:
-             item.clicked[int, str].connect(self._on_store_data)
+        for delegate in self.delegates:
+             delegate.clicked[int, str].connect(self._on_store_data)
 
         # If send data then update view
         if self.data:
@@ -187,9 +218,9 @@ class PanelControl(PanelBase):
 
     def _on_store_data(self, index, value):
         if index <= len(self.data):
-            self.data[index] = value
+            self.data[self.page * 50 + index] = value
 
-    def set_data(self, data):
+    def set_model(self, data):
         self.data = data
         self.update_()
     
@@ -201,9 +232,8 @@ class PanelControl(PanelBase):
         return self.data
 
     def update_(self):
-        for item, value in zip(self.items, self.data):
-            item.setText(value)
-
+        for delegate, value in zip(self.delegates, self.data[self.page * 50 : self.page * 50 + 50]):
+            delegate.setText(value)
 
 
 class NamedWidget(QWidget):
@@ -231,7 +261,7 @@ class NamedSwitchButton(NamedWidget):
         self.button = button = SwitchButton(labels=self.labels)
         button.setFixedWidth(40)
         button.setFixedHeight(20)
-        layout =  QFormLayout(self)
+        layout = QFormLayout(self)
         layout.setContentsMargins(2, 1, 1, 1)
         layout.addRow(self.label, self.button)
 

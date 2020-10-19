@@ -59,7 +59,7 @@ class Ui(QMainWindow):
         self.control = self.createButtons()
 
         gbox = QGroupBox()
-        self.panel = PanelManager(gbox, n_channels=self.degaus_config['channels'])
+        self.panel = PanelManager(gbox, size=self.degaus_config['channels'])
 
         # Layouts
         centralLayout = QVBoxLayout(centralWgt)
@@ -85,7 +85,6 @@ class Ui(QMainWindow):
         for (name, key, enabled, icon) in (
                 ('Cтарт', 'start', True, ':/rc/red-start.png'),
                 ('Cтоп', 'stop', False, ':/rc/red-stop.png'),
-                ('Cброс', 'reset', True, ':/rc/red-stop.png'),
                 ('Cправка', 'about', True, ':/rc/red-about.png'),
                 ('Выход', 'exit', True, ':/rc/red-quit.png')
         ):
@@ -257,7 +256,6 @@ class ProxyApp(Ui):
         # Connect signal/slot
         self.buttons['start'].clicked.connect(self.on_start)
         self.buttons['stop'].clicked.connect(self.on_stop)
-        self.buttons['reset'].clicked.connect(self.on_reset)
         self.buttons['exit'].clicked.connect(self.on_quit)
         self.protocol_group['channels'].currentTextChanged['QString'].connect(self.on_change_channels)
 
@@ -273,16 +271,11 @@ class ProxyApp(Ui):
         return config
 
     def get_pattern(self):
-        return list(self.panel.control_fetch())
+        return list(self.panel.fetch_pattern())
 
     def on_change_channels(self, text: str):
-        self.panel.control_clear()
         nChannels = int(text)
-
-        if nChannels > 50:
-            self.panel.radiobox_locked(True)
-        else:
-            self.panel.radiobox_locked(False)
+        self.panel.set_size(nChannels)
 
     def on_run(self):
         """ """
@@ -308,7 +301,7 @@ class ProxyApp(Ui):
         #     self.statusBar().showMessage("Необходимо выбрать разные порты!", 2000)
         #     return
 
-        self.panel.switch_to_panelview()
+        self.panel.show_panelview()
         self._lock(True)
 
         settings = self.get_settings()
