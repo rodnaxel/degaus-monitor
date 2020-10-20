@@ -103,7 +103,7 @@ def split_seq(seq, start=1, stop=3):
         seq = seq[stop:]
 
 
-def generate_other_pattern(pattern, imax=9.99, *, as_voltage=False):
+def message_pattern(pattern, imax=9.99, *, as_voltage=False):
     """ This function generate pattern and return it as generator
     :param pattern:
     """
@@ -154,7 +154,6 @@ class VoltageHandler:
             res.append(int((self.imax / self.vmax) * self.ku * value) * 100)
         return res
 
-
 #TODO: Make function read message from com-port 
 def read():
     input_data = [300, 0, 0, 0, 0, 0]
@@ -162,20 +161,35 @@ def read():
     print("read: ", message.hex())
     return message
 
-def read_from_serial(port):
-    with serial.SerialBase(port=port) as s:
-        s.readline(port)
-
 #TODO: Make function write message to com-port
 def write(message):
     msg = message.hex()
     length = len(message)
-
     print(f"out: {length} : {msg}")
 
-def redirect(reader, writter, handlers):
+def write_to_serial(message):
+    with serial.Serial as sobj:
+        sobj.writelines(message)
+
+
+class VirtualPort(serial.Serial):
+    def __init__(self, *args, **kwargs):
+        super(VirtualPort, self).__init__()
+        input_data = [300, 0, 0, 0, 0, 0]
+        self.message = create_message(input_data, protocol=protocols['input'])
+
+    def read(self, size=1):
+        return self.message
+
+    def write(self, message):
+        msg = message.hex()
+        length =  len(message)
+        print(f"send: {length=}, {msg=}\n")
+
+
+def redirect(reader, writter, handlers, dbytes=False):
     """ This function read message from reader and redirect it to writter."""
-    message = reader()
+    message = reader.read()
 
     data = parse_message(message)
     QUEUE_INPUT.append(data)
@@ -186,23 +200,43 @@ def redirect(reader, writter, handlers):
 
     QUEUE.append(data)
 
-    message = create_message(data, protocol=protocols['output']['cm'])
 
-    writter(message)
+    if dbytes:
+        protocol_name = 'amk'
+    else:
+        protocol_name = 'cm'
+
+    message = create_message(data, protocol=protocols['output'][protocol_name])
+
+    writter.write(message)
 
     return message
 
 
-def run(pattern, config):
-    pattern = generate_other_pattern(pattern, config['imax'])
+def run(pattern, settings):
+    pattern = message_pattern(pattern, settings['imax'])
     handlers = []
-    handlers.append(VoltageHandler(imax=config['imax']))
-    handlers.append(PatternHandler(pattern=pattern, channels=config['channels']))
-    redirect(read, write, handlers)
+    handlers.append(VoltageHandler(imax=settings['imax']))
+    handlers.append(PatternHandler(pattern=pattern, channels=settings['channels']))
+
+    pin = settings['port_input']
+    pout = settings['port_output']
+
+    if pin == 'VCOM':
+        reader = VirtualPort()
+    else:
+        reader = serial.Serial(port=pin)
+
+    if pout == 'VCOM':
+        writter = VirtualPort()
+    else:
+        writter = serial.Serial(port=pout)
+
+    redirect(reader, writter, handlers, dbytes=settings['channels_byte'])
 
 
 def main():
-    pattern = generate_other_pattern()
+    pattern = message_pattern()
     run(pattern)
 
 

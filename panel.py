@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import *
 
 class PanelManager:
     def __init__(self, parent=None, size=None, *args, **kwargs):
-        print("Create PanelManager:", parent, args, kwargs)
         self.parent = parent
         self.modes = ["Амперметры", "Настройки"]
         self.states = ["Max", 'Min', 'Null', 'L']
@@ -52,7 +51,7 @@ class PanelManager:
 
 
         def _on_switch_all_buttons():
-            print('Invoke <.on_switch_all_buttons()>: ',)
+
             text = self.buttonAll.text()
             self.pattern = [text for i in range(self.size)]
             self.pcontrol.set_data(self.pattern)
@@ -321,7 +320,6 @@ class SwitchButton(QPushButton):
     def __init__(self, parent=None, labels=None, *args, **kwargs):
         super().__init__(text='text', *args, **kwargs)
         self.labels = labels or SwitchButton.DEFAULT_LABELS
-        print(self.labels)
         self.setText(self.labels[0])
 
     def mousePressEvent(self, e):

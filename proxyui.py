@@ -12,7 +12,7 @@ from panel import PanelManager
 import proxy
 
 __title__ = "Мониторинг последовательного канала КЭД КФ1/1М"
-__version__ = "0.1.0"
+__version__ = "1.0.0b1"
 __author__ = "Александр Смирнов"
 
 
@@ -21,7 +21,7 @@ PATH = os.path.dirname(os.path.realpath(__file__))
 config = {
     "degaus": {
         "headers": ("CM2",),
-        "channels": ("43", "121", "150"),
+        "channels": ("43", "48", "121", "150"),
         "currents": ("10", "55"),
         "interval": ("1000",)
     }
@@ -88,6 +88,11 @@ class Ui(QMainWindow):
                 ('Cправка', 'about', True, ':/rc/red-about.png'),
                 ('Выход', 'exit', True, ':/rc/red-quit.png')
         ):
+            if key == 'stop':
+                wgt = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
+                layout.addWidget(wgt)
+                continue
+
             self.buttons[key] = button = QPushButton(name)
             button.setEnabled(enabled)
             button.setIcon(QIcon(icon))
@@ -126,10 +131,14 @@ class Ui(QMainWindow):
         def _on_find_ports():
             port_input.clear()
             port_output.clear()
+
+
             ports = proxy.scan()
-            ports.append('virtual')
-            
-            port_input.addItems(ports)
+            ports.append('VCOM')
+
+            # TODO: Uncomment when you test with ADC
+            #port_input.addItems(ports)
+            port_input.addItem('VCOM')
             port_output.addItems(ports)
 
             if len(ports) > 1:
