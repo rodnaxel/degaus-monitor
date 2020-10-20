@@ -133,7 +133,6 @@ class PanelManager:
             self.radiobox.buttonClicked.emit(default_button)
 
 
-
 class PanelBase(QWidget):
     ROW = 10
     COL = 5
@@ -237,9 +236,10 @@ class PanelControl(PanelBase):
             print(e, index, value)
 
     def update_(self):
-        for delegate, value in zip(self.delegates, self.data[self.page * 50 : self.page * 50 + 50]):
-            delegate.setText(value)
-
+        # Delegates 50, Data 43
+        values = self.data[self.page * 50 : self.page * 50 + 50]
+        for delegate, value in zip(self.delegates, values):
+           delegate.setText(value)
 
 class NamedWidget(QWidget):
     """ This base class for named widgets """
@@ -259,11 +259,10 @@ class NamedSwitchButton(NamedWidget):
 
     def __init__(self, parent=None, name='Label', labels=None, *args, **kwargs):
         super().__init__(parent, name, *args, **kwargs)
-        self.labels = labels  or ["Max", 'Min', 'Null', 'L']
         self.createUi()
 
     def createUi(self):
-        self.button = button = SwitchButton(labels=self.labels)
+        self.button = button = SwitchButton()
         button.setFixedWidth(40)
         button.setFixedHeight(20)
         layout = QFormLayout(self)
@@ -317,9 +316,12 @@ class NamedEdit(NamedWidget):
 
 
 class SwitchButton(QPushButton):
+    DEFAULT_LABELS = ["Max", 'Min', 'Null', 'L']
+
     def __init__(self, parent=None, labels=None, *args, **kwargs):
         super().__init__(text='text', *args, **kwargs)
-        self.labels = labels or ["Max", 'Min', 'Null', 'L']
+        self.labels = labels or SwitchButton.DEFAULT_LABELS
+        print(self.labels)
         self.setText(self.labels[0])
 
     def mousePressEvent(self, e):
