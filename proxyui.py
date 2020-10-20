@@ -88,9 +88,9 @@ class Ui(QMainWindow):
                 ('Cправка', 'about', True, ':/rc/red-about.png'),
                 ('Выход', 'exit', True, ':/rc/red-quit.png')
         ):
-            if key == 'stop':
-                wgt = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
-                layout.addWidget(wgt)
+            if key == 'about':
+                sitem = QSpacerItem(1, 1, QSizePolicy.Expanding, QSizePolicy.Minimum)
+                layout.addSpacerItem(sitem)
                 continue
 
             self.buttons[key] = button = QPushButton(name)
