@@ -275,7 +275,7 @@ class ProxyApp(Ui):
 
     def on_change_channels(self, text: str):
         nChannels = int(text)
-        self.panel.set_size(nChannels)
+        self.panel.resize(nChannels)
 
     def on_run(self):
         """ """
@@ -285,16 +285,13 @@ class ProxyApp(Ui):
 
         if proxy.QUEUE:
             data = proxy.QUEUE.popleft()
-            self.panel.view_update(data)
+            self.panel.view_show(data)
             input_str = "Voltage: " + ",".join([str(i) for i in proxy.QUEUE_INPUT.popleft()])
             self.statusBar().showMessage(input_str)
 
         config = self.get_settings()
         pattern = self.get_pattern()
         proxy.run(pattern, config)
-
-    def on_reset(self):
-        self.panel.control_clear()
 
     def on_start(self):
         # if config['port_input'] == config['port_output']:

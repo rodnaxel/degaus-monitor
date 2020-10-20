@@ -18,7 +18,7 @@ class PanelManager:
 
         self.page = 0
         self.pattern = [self.states[2] for i in range(self.size)]
-        self.values = [0 for i in range(self.size)]
+        self.values = ["-" for i in range(self.size)]
 
         self._createUi()
 
@@ -37,7 +37,6 @@ class PanelManager:
 
         def _on_switch_group(rbutton):
             """ If switch group, then rename field labels by panel"""
-            print('Invoke <.on_switch_group()>: ', rbutton)
             group = rbutton.text()
             if group == "I":
                 self.page = 0
@@ -47,14 +46,17 @@ class PanelManager:
                 self.page = 2
             else:
                 raise ValueError("Dont find group name")
-            current = self.stack.currentWidget()
+            #current = self.stack.currentWidget()
+            for i in range(2):
+                self.stack.widget(i).set_page(self.page)
 
 
         def _on_switch_all_buttons():
             print('Invoke <.on_switch_all_buttons()>: ',)
             text = self.buttonAll.text()
             self.pattern = [text for i in range(self.size)]
-            
+            self.pcontrol.set_data(self.pattern)
+
         self.parent.setTitle('Амперметры')
 
         # Radiobuttons for switch group (only channels more than 50)
@@ -70,7 +72,7 @@ class PanelManager:
         self.buttonSwitch.setMinimumWidth(120)
 
         # Panels
-        self.pview = PanelView()
+        self.pview = PanelView(data=self.values)
         self.pcontrol = PanelControl(data=self.pattern)
         
         # Layouts
@@ -95,21 +97,19 @@ class PanelManager:
         self.buttonAll.clicked.connect(_on_switch_all_buttons)
         self.buttonSwitch.clicked.connect(_on_switch_panel)
 
-    def set_size(self, n):
+    def resize(self, n):
         self.size = n
-
         # Lock/Unlock radiobuttons {I, II, III}
         if self.size > 50:
             self.radiobox_enabled(True)
         else:
             self.radiobox_enabled(False)
-
         # Change pattern
         self.pattern = [self.states[2] for i in range(self.size)]
-        self.pcontrol.set_model(self.pattern)
-        
+        self.pcontrol.set_data(self.pattern)
         # Change values
-        self.values = [0 for i in range(self.size)]
+        self.values = ["-" for i in range(self.size)]
+        self.pview.set_data(self.values)
 
     def show_panelview(self):
         self.stack.setCurrentIndex(0)
@@ -117,14 +117,10 @@ class PanelManager:
         self.buttonAll.setVisible(False)  
 
     def fetch_pattern(self):
-        print("pcontol.get_states(): ",self.pcontrol.get_states())
         return self.pattern
 
-    def control_clear(self):
-        print("Invoke .pcontrol.clear()")
-
-    def view_update(self, data):
-        self.pview.update_(data)
+    def view_show(self, data):
+        self.pview.set_data(data)
 
     def view_clear(self):
         self.pview.clear()
@@ -161,23 +157,31 @@ class PanelBase(QWidget):
                 edit = wgt(name=name, **kwargs)
                 self.layout().addWidget(edit, r, c)
                 self.delegates.append(edit)
-        
-    def set_model(self, data):
-        print('Invoke <PanelBase.set_data()>', data)
+
+    def clear(self):
+        print('<PanelBase.clear>')
+        # for delegate in self.delegates:
+        #     delegate.clear()
+
+    def get_data(self):
+        return self.data
+
+    def set_data(self, data):
+        self.data = data
+        self.update_()
 
     def set_page(self, page):
         self.page = page
-
-    def clear(self):
-        for delegate in self.delegates:
-            delegate.clear()
-
-    def update_(self):
-        print('Invoke <PanelBase.update_()>')
+        label = (str(i) for i in range(page * 50 + 1, page * 50 + 51))
+        self.rename(label)
+        self.update_()
 
     def rename(self, names):
         for delegate, name in zip(self.delegates, names):
             delegate.setName(name)
+
+    def update_(self):
+        print('Invoke <PanelBase.update_()>')
 
 
 class PanelView(PanelBase):
@@ -186,14 +190,25 @@ class PanelView(PanelBase):
     of voltage/current in the channels 
     """
 
-    def __init__(self, parent=None, *args, **kwargs):
+    def __init__(self, parent=None, data=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
+        self.data = data
         self._createUI(NamedEdit)
 
-    def update_(self, data):
-        for item, value in zip(self.delegates, data):
-            txt = '{0:=6.2f}'.format(value/100)
-            item.display(txt)
+        if self.data:
+            self.update_()
+
+    def clear(self):
+        self.data = ['-' for v in self.data]
+        self.update_()
+
+    def update_(self):
+        for delegate, value in zip(self.delegates, self.data[self.page * 50 : self.page * 50 + 50]):
+            if isinstance(value, int):
+                txt = '{0:=6.2f}'.format(value/100)
+            else:
+                txt = value
+            delegate.display(txt)
 
 
 class PanelControl(PanelBase):
@@ -201,7 +216,6 @@ class PanelControl(PanelBase):
     The class representing widget to configure 
     of voltage/current in the channels 
     """
-
     def __init__(self, parent=None, data=None, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.data = data
@@ -210,26 +224,17 @@ class PanelControl(PanelBase):
 
         # Connect signal/slot
         for delegate in self.delegates:
-             delegate.clicked[int, str].connect(self._on_store_data)
+             delegate.clicked[int, str].connect(self._on_store)
 
         # If send data then update view
         if self.data:
             self.update_()
 
-    def _on_store_data(self, index, value):
-        if index <= len(self.data):
-            self.data[self.page * 50 + index] = value
-
-    def set_model(self, data):
-        self.data = data
-        self.update_()
-    
-    def set_states(self, data):
-        self.set_data(data)
-
-    def get_states(self):
-        print(".get_states: ", len(self.data), self.data)
-        return self.data
+    def _on_store(self, index, value):
+        try:
+            self.data[index] = value
+        except IndexError as e:
+            print(e, index, value)
 
     def update_(self):
         for delegate, value in zip(self.delegates, self.data[self.page * 50 : self.page * 50 + 50]):
@@ -313,7 +318,7 @@ class NamedEdit(NamedWidget):
 
 class SwitchButton(QPushButton):
     def __init__(self, parent=None, labels=None, *args, **kwargs):
-        super().__init__(text='new', *args, **kwargs)
+        super().__init__(text='text', *args, **kwargs)
         self.labels = labels or ["Max", 'Min', 'Null', 'L']
         self.setText(self.labels[0])
 
