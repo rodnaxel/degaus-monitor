@@ -1,16 +1,23 @@
 
+# IDE directories
 /.idea
 /.ropeproject
-/.pytest_cache
 .vscode/
-/__pycache__
-/test/__pycache__
 *.code-workspace
 *.sublime-project
 *.sublime-workspace
 
+# Cache
+/__pycache__
+/test/__pycache__
+/.pytest_cache
+
+# Build directories
+/build
+/dist
+
+# Other files
 *.bak
-*.bat
 *.dat
 *.ini
 *.pyc

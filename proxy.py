@@ -214,7 +214,7 @@ def redirect(reader, writter, handlers, dbytes=False):
 
 
 def run(pattern, settings):
-    pattern = message_pattern(pattern, settings['imax'])
+    pattern = message_pattern(pattern, imax=(settings['imax'] - 0.01))
     handlers = []
     handlers.append(VoltageHandler(imax=settings['imax']))
     handlers.append(PatternHandler(pattern=pattern, channels=settings['channels']))
