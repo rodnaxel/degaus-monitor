@@ -158,8 +158,6 @@ class PanelBase(QWidget):
 
     def clear(self):
         print('<PanelBase.clear>')
-        # for delegate in self.delegates:
-        #     delegate.clear()
 
     def get_data(self):
         return self.data

@@ -25,6 +25,10 @@ Format "AMK"
     where DATA = | Channel | Value | ... | Channel43/150 | Value43/150 |
 '''
 
+# Header   | 1 channel| ...                                                  | CS | End
+# 24 30 31 | 01 00 00 | 02 00 00 | 03 00 00 | 04 00 00 | 05 00 00 | 06 00 00 | 21 | 0D 0A
+#             |  +- value
+#             +---- No Channel
 protocols = {
     "input": {"header": "$01", "end": "\r\n", "count_bytes": False},
     "output": {
@@ -132,7 +136,6 @@ class PatternHandler:
     def _handle(self, data: list) -> list:
         value = data[0]
         data_changed = [value if i == 'L' else i for i in self.pattern]
-
         return data_changed
 
 
@@ -151,25 +154,22 @@ class VoltageHandler:
     def _handler(self, data):
         res = []
         for value in data:
-            res.append(int((self.imax / self.vmax) * self.ku * value) * 100)
+            res.append(int((self.imax / self.vmax) * self.ku * value * 100))
         return res
 
-#TODO: Make function read message from com-port 
-def read():
-    input_data = [300, 0, 0, 0, 0, 0]
-    message = create_message(input_data, protocol=protocols['input'])
-    print("read: ", message.hex())
-    return message
 
-#TODO: Make function write message to com-port
-def write(message):
-    msg = message.hex()
-    length = len(message)
-    print(f"out: {length} : {msg}")
+class PortInput(object):
+    def __init__(self, port, *args, **kwargs):
+        self.sobj = serial.Serial(port)
 
-def write_to_serial(message):
-    with serial.Serial as sobj:
-        sobj.writelines(message)
+    def read(self, size=1):
+        start = True
+        while start:
+            header = self.sobj.read(1)
+            if header == b"$":
+                msg = header + self.sobj.read(size=23)
+                start = False
+        return msg
 
 
 class VirtualPort(serial.Serial):
@@ -183,14 +183,13 @@ class VirtualPort(serial.Serial):
 
     def write(self, message):
         msg = message.hex()
-        length =  len(message)
+        length = len(message)
         print(f"send: {length=}, {msg=}\n")
 
 
 def redirect(reader, writter, handlers, dbytes=False):
     """ This function read message from reader and redirect it to writter."""
     message = reader.read()
-
     data = parse_message(message)
     QUEUE_INPUT.append(data)
 
@@ -199,7 +198,6 @@ def redirect(reader, writter, handlers, dbytes=False):
             data = handler(data)
 
     QUEUE.append(data)
-
 
     if dbytes:
         protocol_name = 'amk'
@@ -225,7 +223,7 @@ def run(pattern, settings):
     if pin == 'VCOM':
         reader = VirtualPort()
     else:
-        reader = serial.Serial(port=pin)
+        reader = PortInput(port=pin)
 
     if pout == 'VCOM':
         writter = VirtualPort()
@@ -236,8 +234,21 @@ def run(pattern, settings):
 
 
 def main():
-    pattern = message_pattern()
-    run(pattern)
+    sobj = PortInput(port="COM8")
+    handlers = []
+    handlers.append(VoltageHandler())
+
+    try:
+        while True:
+            msg = sobj.read()
+            data = parse_message(msg)
+
+            if handlers:
+                for handler in handlers:
+                    data = handler(data)
+
+    except KeyError as e:
+        pass
 
 
 if __name__ == "__main__":

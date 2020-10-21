@@ -137,8 +137,8 @@ class Ui(QMainWindow):
             ports.append('VCOM')
 
             # TODO: Uncomment when you test with ADC
-            #port_input.addItems(ports)
-            port_input.addItem('VCOM')
+            port_input.addItems(ports)
+            #port_input.addItem('VCOM')
             port_output.addItems(ports)
 
             if len(ports) > 1:
@@ -255,6 +255,8 @@ class Ui(QMainWindow):
     def updateStatus(self, key, value):
         self.status[key].setText(' {}: {}'.format('отп', value))
 
+
+import threading
 
 class ProxyApp(Ui):
     def __init__(self):
