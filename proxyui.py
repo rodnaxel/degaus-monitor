@@ -12,7 +12,7 @@ from panel import PanelManager
 import proxy
 
 __title__ = "Мониторинг последовательного канала КЭД КФ1/1М"
-__version__ = "1.0.0b1"
+__version__ = "1.0.0"
 __author__ = "Александр Смирнов"
 
 
@@ -26,7 +26,6 @@ config = {
         "interval": ("1000",)
     }
 }
-
 
 class Ui(QMainWindow):
     def __init__(self):
@@ -52,6 +51,12 @@ class Ui(QMainWindow):
 
         centralWgt = QWidget(self)
         self.setCentralWidget(centralWgt)
+
+        menubar = self.menuBar()
+        self.sysconf_action = QAction('&Создать sysconf', self)
+        file_menu = menubar.addMenu('&Файл')
+        file_menu.addAction(self.sysconf_action)
+
         self.createStatusbar()
 
         self.portbox = self.createPortbox()
@@ -220,8 +225,8 @@ class Ui(QMainWindow):
         return wgt
 
     def createStatusbar(self):
-        pix = QLabel("idle")
-        self.statusBar().addPermanentWidget(pix)
+        self.pix = QLabel("idle")
+        self.statusBar().addPermanentWidget(self.pix)
         #self.status['pixmap'] = pix
         #self.updatePixmap('noconnect')
 
@@ -256,8 +261,6 @@ class Ui(QMainWindow):
         self.status[key].setText(' {}: {}'.format('отп', value))
 
 
-import threading
-
 class ProxyApp(Ui):
     def __init__(self):
         super(ProxyApp, self).__init__()
@@ -269,6 +272,14 @@ class ProxyApp(Ui):
         self.buttons['stop'].clicked.connect(self.on_stop)
         self.buttons['exit'].clicked.connect(self.on_quit)
         self.protocol_group['channels'].currentTextChanged['QString'].connect(self.on_change_channels)
+
+        self.sysconf_action.triggered.connect(self._create_sysconf)
+
+    def _create_sysconf(self):
+        full_path = os.path.join(PATH, "sysconf.json")
+        with open(full_path, 'w') as f:
+            json.dump(config, f, ensure_ascii=False, indent=4)
+        self.statusBar().showMessage(f"Создан файл настроек {full_path}")
 
     def closeEvent(self, event):
         self.on_quit()
@@ -292,13 +303,14 @@ class ProxyApp(Ui):
         """ """
         # Its Debug code
         time = QtCore.QTime()
-        print("Event: ", time.currentTime().toString('hh:mm:ss:zz'))
 
         if proxy.QUEUE:
             data = proxy.QUEUE.popleft()
             self.panel.view_show(data)
             input_str = "Voltage: " + ",".join([str(i) for i in proxy.QUEUE_INPUT.popleft()])
             self.statusBar().showMessage(input_str)
+        else:
+            self.statusBar().showMessage('Отсутствует сообщение')
 
         config = self.get_settings()
         pattern = self.get_pattern()
@@ -316,6 +328,8 @@ class ProxyApp(Ui):
         pattern = self.get_pattern()
         proxy.run(pattern, settings)
 
+        self.pix.setText('Обмен')
+
         self.timer_id = self.startTimer(settings['interval'], timerType=QtCore.Qt.PreciseTimer)
 
     def on_stop(self):
@@ -326,6 +340,7 @@ class ProxyApp(Ui):
             self.timer_id = 0
 
         self.panel.view_clear()
+        self.pix.setText('idle')
         self.statusBar().showMessage("Отключено", 2000)
 
     def on_quit(self):
@@ -333,6 +348,20 @@ class ProxyApp(Ui):
             self.killTimer(self.timer_id)
             self.timer_id = 0
         QtCore.QCoreApplication.exit(0)
+
+
+def load_config():
+    global config
+
+    try:
+        with open(os.path.join(PATH, "sysconf.json")) as f:
+            user_config = json.load(f)
+    except FileNotFoundError as e:
+        pass
+    except json.decoder.JSONDecodeError as e:
+        pass
+    else:
+        config = user_config
 
 
 if __name__ == '__main__':
@@ -346,11 +375,7 @@ if __name__ == '__main__':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
         app.setWindowIcon(QIcon(':/rc/Interdit.ico'))
 
-    try:
-        with open(os.path.join(PATH, "config.json")) as f:
-            config = json.load(f)
-    except FileNotFoundError as e:
-        pass
+    load_config()
 
     pui = ProxyApp()
     sys.exit(app.exec_())

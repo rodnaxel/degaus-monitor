@@ -23,12 +23,14 @@ Format "CM":
 Format "AMK" 
 | Header (3 bytes) | Number Channels (1 bytes) | Data (variable) | Checksum (1 bytes) | End (2 bytes)|
     where DATA = | Channel | Value | ... | Channel43/150 | Value43/150 |
+    
+Format <Input from ADC>
+| Header   | 1 channel| ...                                                  | CS | End
+| 24 30 31 | 01 00 00 | 02 00 00 | 03 00 00 | 04 00 00 | 05 00 00 | 06 00 00 | 21 | 0D 0A
+             |  +-> value
+             +----> Num Channel
 '''
 
-# Header   | 1 channel| ...                                                  | CS | End
-# 24 30 31 | 01 00 00 | 02 00 00 | 03 00 00 | 04 00 00 | 05 00 00 | 06 00 00 | 21 | 0D 0A
-#             |  +- value
-#             +---- No Channel
 protocols = {
     "input": {"header": "$01", "end": "\r\n", "count_bytes": False},
     "output": {
@@ -163,12 +165,12 @@ class PortInput(object):
         self.sobj = serial.Serial(port)
 
     def read(self, size=1):
-        start = True
-        while start:
+        ready = False
+        while not ready:
             header = self.sobj.read(1)
             if header == b"$":
                 msg = header + self.sobj.read(size=23)
-                start = False
+                ready = True
         return msg
 
 

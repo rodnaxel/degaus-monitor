@@ -17,6 +17,7 @@
 /dist
 
 # Other files
+*.json
 *.bak
 *.dat
 *.ini
