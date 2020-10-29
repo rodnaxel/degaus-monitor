@@ -12,7 +12,7 @@ from panel import PanelManager
 import proxy
 
 __title__ = "Мониторинг последовательного канала КЭД КФ1/1М"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Александр Смирнов"
 
 

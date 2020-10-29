@@ -6,7 +6,6 @@
 """
 
 from collections import deque
-from dataclasses import dataclass
 import glob
 from functools import reduce
 import sys
@@ -120,17 +119,15 @@ def message_pattern(pattern, imax=9.99, *, as_voltage=False):
     }
     return [kwarg[key] if key != 'L' else key for key in pattern]
 
-@dataclass
 class PatternHandler:
     """ This class represents a hook. 
     It changes data in the message with specified pattern 
     and returns a new data.
     """
-    pattern: list = None
-    channels: int = None
 
-    def __post_init__(self):
-        self.pattern = self.pattern[:self.channels]
+    def __init__(self, pattern, channels):
+        self.channels = channels
+        self.pattern = pattern[:channels]
 
     def __call__(self, data):
         return self._handle(data)
@@ -141,14 +138,14 @@ class PatternHandler:
         return data_changed
 
 
-@dataclass
 class VoltageHandler:
     """ This handler convert all values in data to current
     and return list of values"""
     
-    imax: float = 9.99
-    vmax: float = 300
-    ku: float = 1            # Coefficient corect ADC values
+    def __init__(self, imax=9.99, vmax=300, ku=1):
+        self.imax = imax
+        self.vmax = vmax
+        self.ku = ku    
 
     def __call__(self, data):
         return self._handler(data)
@@ -186,7 +183,7 @@ class VirtualPort(serial.Serial):
     def write(self, message):
         msg = message.hex()
         length = len(message)
-        print(f"send: {length=}, {msg=}\n")
+        print("send: {0}, {1}\n".format(length, msg))
 
 
 def redirect(reader, writter, handlers, dbytes=False):
@@ -215,6 +212,7 @@ def redirect(reader, writter, handlers, dbytes=False):
 
 def run(pattern, settings):
     pattern = message_pattern(pattern, imax=(settings['imax'] - 0.01))
+
     handlers = []
     handlers.append(VoltageHandler(imax=settings['imax']))
     handlers.append(PatternHandler(pattern=pattern, channels=settings['channels']))
